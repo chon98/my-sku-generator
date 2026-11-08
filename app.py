@@ -20,7 +20,7 @@ channel_map = {
     'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
-# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด
+# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด (แก้ไขวิธีดึงรหัสตัวอักษรคอลัมน์แล้ว)
 def style_excel_sheet(writer, sheet_name):
     worksheet = writer.sheets[sheet_name]
     worksheet.freeze_panes = "A2"
@@ -34,9 +34,10 @@ def style_excel_sheet(writer, sheet_name):
             cell.font = header_font
             cell.alignment = header_alignment
             
-    for col in worksheet.columns:
+    # แก้ไขจุดนี้: ใช้ enumerate นับลำดับตัวเลขคอลัมน์ (เริ่มจาก 1) แทนการใช้คำสั่ง col.column ป้องกันการเกิดข้อผิดพลาดประเภท Tuple
+    for idx, col in enumerate(worksheet.columns, start=1):
         max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col.column)
+        col_letter = get_column_letter(idx)
         worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
 tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายช่องทาง (Bulk Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
@@ -55,7 +56,6 @@ with tab1:
         
         product_name = st.text_input("ชื่อสินค้า (เช่น ชานม)", placeholder="กรอกชื่อสินค้า").strip()
         
-        # แก้ไขจุดนี้: เปลี่ยนมาใช้กล่องข้อความภายนอกตารางที่เลือกได้หลายตัวเลือกพร้อมกันแบบปลอดภัย 100%
         channels_input = st.multiselect(
             "เลือกช่องทางการขายที่ต้องการ (เลือกได้มากกว่า 1 ช่องทางพร้อมกัน)",
             options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
@@ -70,20 +70,17 @@ with tab1:
         elif not channels_input:
             st.error("⚠️ กรุณาเลือกช่องทางการขายอย่างน้อย 1 ช่องทาง")
         else:
-            # จัดการแยกรายการ SKU ที่พิมพ์เข้ามาด้วยการขึ้นบรรทัดใหม่ หรือ เครื่องหมายจุลภาค
             raw_skus = sku_input.replace('\n', ',').split(',')
             sku_list = [sku.strip() for sku in raw_skus if sku.strip()]
             
             manual_results = []
             
-            # จัดการตัวเลือกช่องทางการขาย
             selected_channels = []
             if "ทุกช่องทางการขาย" in channels_input:
                 selected_channels = list(channel_map.keys())
             else:
                 selected_channels = channels_input
             
-            # ทำการคละประมวลผลแตกข้อมูลออกมาตามช่องทางที่ติ๊กเลือก
             for single_sku in sku_list:
                 for channel in selected_channels:
                     info = channel_map.get(channel)
@@ -99,7 +96,6 @@ with tab1:
             
             if len(manual_results) > 0:
                 df_manual_res = pd.DataFrame(manual_results)
-                # จัดเรียงตามกลุ่มสินค้าเดิม และรหัสช่องทางการขาย
                 df_manual_res = df_manual_res.sort_values(by=['SKU เดิม', '_Sort_Code']).reset_index(drop=True)
                 
                 output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
