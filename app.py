@@ -4,51 +4,52 @@ import io
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
-st.set_page_config(page_title="SKU Generator Pro", layout="wide")
+st.set_page_config(
+    page_title="SKU Generator Pro", 
+    page_icon="📦", 
+    layout="wide"
+)
+
 st.title("📦 ระบบสร้างรหัส SKU สินค้าตามช่องทางการขาย")
+st.write("จัดการสร้างรหัสสินค้าแยกตามช่องทางการขายอัตโนมัติ รวดเร็ว แม่นยำ")
+st.write("---")
 
 channel_map = {
     'Eat in': {'code': '01', 'abbr': 'EI'},
     'Take away': {'code': '02', 'abbr': 'TA'},
-    'Delivery': {'code': '03', 'abbr': 'DL'},
-    'Grab food': {'code': '04', 'abbr': 'GF'}
+    'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
-# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด (แก้ไขตัวบั๊กแล้ว)
+# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด
 def style_excel_sheet(writer, sheet_name):
     worksheet = writer.sheets[sheet_name]
-    
-    # 1. ตรึงแนวแถวบนสุด (Freeze Panes)
     worksheet.freeze_panes = "A2"
-    
-    # สีพื้นหลังสีน้ำเงินเข้ม (Hex: 1F4E78)
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
-    # ฟอนต์ตัวหนา สีขาว
     header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
     header_alignment = Alignment(horizontal="center", vertical="center")
     
-    # ตกแต่งแถวที่ 1 (Header Row)
     for col in worksheet.iter_cols(min_row=1, max_row=1):
         for cell in col:
             cell.fill = header_fill
             cell.font = header_font
             cell.alignment = header_alignment
             
-    # ปรับความกว้างคอลัมน์อัตโนมัติ (แก้ไขวิธีหาตัวเลขคอลัมน์)
     for col in worksheet.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
-        # ดึงเลขคอลัมน์จากเซลล์แรกสุดในคอลัมน์นั้น (cell.column) แทน col.column
-        col_letter = get_column_letter(col[0].column)
+        col_letter = get_column_letter(col.column)
         worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
 tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายช่องทาง (Grid Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
+# ==========================================
+# แท็บที่ 1: ตารางกรอกข้อมูลเอง
+# ==========================================
 with tab1:
-    st.subheader("📝 ตารางกรอกข้อมูลสินค้า (ระบุช่องทางการขายแยกรายแถวได้)")
-    st.caption("💡 วิธีใช้งาน: ดับเบิ้ลคลิกเพื่อพิมพ์ข้อมูล / เลือกช่องทางการขายจากเมนู Dropdown / กดปุ่มด้านล่างสุดของตารางเพื่อเพิ่มแถวใหม่ (+ Add row)")
+    st.subheader("📝 ตารางกรอกข้อมูลสินค้า")
+    st.caption("💡 วิธีใช้งาน: ดับเบิ้ลคลิกเพื่อพิมพ์ข้อมูล / คลิกเลือกช่องทางการขาย (เลือกได้มากกว่า 1 ช่องทางพร้อมกัน) / กดปุ่ม (+ Add row) ด้านล่างสุดเพื่อเพิ่มแถวใหม่")
     
     init_data = [
-        {"SKU เดิม": "", "ชื่อสินค้า": "", "ช่องทางการขาย": "Eat in"}
+        {"SKU เดิม": "", "ชื่อสินค้า": "", "เลือกช่องทางการขาย": ["Eat in"]}
     ]
     df_init = pd.DataFrame(init_data)
     
@@ -59,8 +60,8 @@ with tab1:
         column_config={
             "SKU เดิม": st.column_config.TextColumn("รหัส SKU เดิม (เช่น PROD001)", required=True),
             "ชื่อสินค้า": st.column_config.TextColumn("ชื่อสินค้า (เช่น ชานม)", required=True),
-            "ช่องทางการขาย": st.column_config.SelectboxColumn(
-                "เลือกช่องทางการขาย",
+            "เลือกช่องทางการขาย": st.column_config.ListColumn(
+                "เลือกช่องทางการขาย (เลือกได้หลายช่องทาง)",
                 options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
                 required=True
             )
@@ -74,7 +75,7 @@ with tab1:
         for index, row in edited_df.iterrows():
             sku_old = str(row["SKU เดิม"]).strip() if pd.notna(row["SKU เดิม"]) else ""
             p_name = str(row["ชื่อสินค้า"]).strip() if pd.notna(row["ชื่อสินค้า"]) else ""
-            channel_input = row["ช่องทางการขาย"]
+            channels_input = row["เลือกช่องทางการขาย"]
             
             if not sku_old and not p_name:
                 continue
@@ -83,9 +84,21 @@ with tab1:
                 st.error(f"⚠️ แถวที่ {index + 1} กรอกข้อมูลไม่ครบ กรุณาระบุทั้ง SKU เดิม และ ชื่อสินค้า")
                 has_error = True
                 break
+                
+            if not channels_input or len(channels_input) == 0:
+                st.error(f"⚠️ แถวที่ {index + 1} ยังไม่ได้เลือกช่องทางการขาย")
+                has_error = True
+                break
             
-            if channel_input == "ทุกช่องทางการขาย":
-                for channel, info in channel_map.items():
+            selected_channels = []
+            if "ทุกช่องทางการขาย" in channels_input:
+                selected_channels = list(channel_map.keys())
+            else:
+                selected_channels = channels_input
+                
+            for channel in selected_channels:
+                info = channel_map.get(channel)
+                if info:
                     new_sku = f"{sku_old}{info['code']}{info['abbr']}"
                     manual_results.append({
                         "New_Product_Code": new_sku,
@@ -94,20 +107,11 @@ with tab1:
                         "_Sort_Code": info['code'],
                         "SKU เดิม": sku_old
                     })
-            else:
-                info = channel_map[channel_input]
-                new_sku = f"{sku_old}{info['code']}{info['abbr']}"
-                manual_results.append({
-                    "New_Product_Code": new_sku,
-                    "ชื่อสินค้า": p_name,
-                    "ช่องทางการขาย": channel_input,
-                    "_Sort_Code": info['code'],
-                    "SKU เดิม": sku_old
-                })
         
         if not has_error and len(manual_results) > 0:
             df_manual_res = pd.DataFrame(manual_results)
             df_manual_res = df_manual_res.sort_values(by=['SKU เดิม', '_Sort_Code']).reset_index(drop=True)
+            
             output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
             df_manual_final = df_manual_res[output_cols]
             
@@ -129,12 +133,16 @@ with tab1:
                 label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (จากตารางกรอกเอง)",
                 data=buffer_manual.getvalue(),
                 file_name="manual_sku_products.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_download_manual_res"
             )
             
         elif not has_error and len(manual_results) == 0:
             st.warning("⚠️ ไม่พบข้อมูลในตาราง กรุณากรอกรหัสสินค้าก่อนกดปุ่ม")
 
+# ==========================================
+# แท็บที่ 2: อัปโหลดไฟล์ Excel
+# ==========================================
 with tab2:
     st.subheader("📥 ดาวน์โหลดไฟล์เทมเพลตสำหรับใช้งาน")
     
@@ -153,7 +161,8 @@ with tab2:
         label="📥 ดาวน์โหลดไฟล์เทมเพลต Excel (.xlsx)",
         data=buffer_template.getvalue(),
         file_name="sku_import_template.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="btn_download_template_xlsx"
     )
     
     st.write("---")
@@ -174,7 +183,7 @@ with tab2:
             with col2:
                 name_col = st.selectbox("เลือกคอลัมน์ที่เป็น [ชื่อสินค้า]", options=columns, key="import_name")
                 
-            if st.button("⚡ เริ่มแตกไฟล์และสร้างรหัส SKU ทั้งหมด"):
+            if st.button("⚡ เริ่มแตกไฟล์และสร้างรหัส SKU ทั้งหมด", type="primary"):
                 expanded_rows = []
                 
                 for _, row in df.iterrows():
@@ -199,7 +208,7 @@ with tab2:
                 output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
                 df_final_export = df_result[output_cols]
                 
-                st.success("🎉 ระบบแตกไฟล์ข้อมูลและสร้างรหัสทุกช่องทางการขายเสร็จเรียบร้อย!")
+                st.success(f"🎉 ระบบแตกไฟล์ข้อมูลและสร้างรหัสทุกช่องทางการขายเสร็จเรียบร้อย ทั้งหมด {len(df_final_export)} รายการ!")
                 st.write("📋 **ผลลัพธ์ข้อมูลใหม่:**")
                 st.dataframe(df_final_export, use_container_width=True)
                 
@@ -208,14 +217,13 @@ with tab2:
                     df_final_export.to_excel(writer, index=False, sheet_name='All_Channels_SKU')
                     style_excel_sheet(writer, 'All_Channels_SKU')
                 
-                st.subheader("📤 ส่งออกไฟล์ข้อมูล (Export Excel)")
                 st.download_button(
                     label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (ครบทุกช่องทาง)",
                     data=buffer.getvalue(),
                     file_name="multi_channel_sku_products.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="btn_download_file_res"
                 )
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
     else:
-        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ที่มีคอลัมน์สำหรับ SKU เดิม และ ชื่อสินค้า (ระบบจะนำแต่ละแถวไปสร้างครบทั้ง 3 ช่องทางให้เองอัตโนมัติ)")
