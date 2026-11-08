@@ -3,7 +3,7 @@ import pandas as pd
 import io
 
 st.set_page_config(page_title="SKU Generator Pro", layout="wide")
-st.title("📦 ระบบสร้างรหัส SKU สินค้าทุกช่องทางการขาย")
+st.title("📦 ระบบสร้างรหัส SKU สินค้าตามช่องทางการขาย")
 
 channel_map = {
     'Eat in': {'code': '01', 'abbr': 'EI'},
@@ -11,37 +11,56 @@ channel_map = {
     'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
-tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเอง (Manual Multi-Channel)", "📥 อัปโหลดไฟล์ Excel (Import Multi-Channel)"])
+tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเอง (Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
 with tab1:
-    st.subheader("กรอกข้อมูล 1 สินค้า เพื่อสร้างรหัสครบทุกช่องทางการขายทันที")
+    st.subheader("กรอกข้อมูลสินค้าเพื่อสร้างรหัส SKU")
     
     with st.form("manual_form", clear_on_submit=False):
-        col_sku, col_name = st.columns(2)
+        col_sku, col_name, col_channel = st.columns(3)
         
         with col_sku:
             sku_input = st.text_input("รหัส SKU เดิม (เช่น PROD001)", placeholder="กรอกรหัส SKU").strip()
         with col_name:
             product_name = st.text_input("ชื่อสินค้า (เช่น ชานม)", placeholder="กรอกชื่อสินค้า").strip()
+        with col_channel:
+            # เพิ่มตัวเลือก "ทุกช่องทางการขาย" เข้าไปใน List
+            channel_options = ["ทุกช่องทางการขาย"] + list(channel_map.keys())
+            channel_input = st.selectbox("เลือกช่องทางการขาย", options=channel_options, key="manual_channel")
             
-        submit_button = st.form_submit_button(label="⚡ สร้างรหัส SKU ครบทุกช่องทาง")
+        submit_button = st.form_submit_button(label="⚡ สร้างรหัส SKU")
 
     if submit_button:
         if not sku_input or not product_name:
             st.error("⚠️ กรุณากรอกรหัส SKU และชื่อสินค้าให้ครบถ้วน")
         else:
             manual_results = []
-            for channel, info in channel_map.items():
+            
+            # กรณีเลือกทำทุกช่องทาง
+            if channel_input == "ทุกช่องทางการขาย":
+                for channel, info in channel_map.items():
+                    new_sku = f"{sku_input}{info['code']}{info['abbr']}"
+                    manual_results.append({
+                        "SKU เดิม": sku_input,
+                        "ชื่อสินค้า": product_name,
+                        "ช่องทางการขาย": channel,
+                        "รหัสสินค้าใหม่": new_sku
+                    })
+                st.success("🎉 สร้างรหัสสินค้าครบทุกช่องทางการขายสำเร็จ!")
+            
+            # กรณีเลือกช่องทางใดช่องทางหนึ่งเจาะจง
+            else:
+                info = channel_map[channel_input]
                 new_sku = f"{sku_input}{info['code']}{info['abbr']}"
                 manual_results.append({
                     "SKU เดิม": sku_input,
                     "ชื่อสินค้า": product_name,
-                    "ช่องทางการขาย": channel,
+                    "ช่องทางการขาย": channel_input,
                     "รหัสสินค้าใหม่": new_sku
                 })
+                st.success(f"🎉 สร้างรหัสสินค้าสำหรับ {channel_input} สำเร็จ!")
             
             df_manual_res = pd.DataFrame(manual_results)
-            st.success("🎉 สร้างรหัสสินค้าครบทั้ง 3 ช่องทางการขายสำเร็จ!")
             st.table(df_manual_res)
 
 with tab2:
@@ -99,7 +118,7 @@ with tab2:
                 
                 st.subheader("📤 ส่งออกไฟล์ข้อมูล (Export Excel)")
                 st.download_button(
-                    label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (คละช่องทางให้ครบ)",
+                    label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (ครบทุกช่องทาง)",
                     data=buffer.getvalue(),
                     file_name="multi_channel_sku_products.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -107,4 +126,4 @@ with tab2:
         except Exception as e:
             st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
     else:
-        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ที่มีคอลัมน์สำหรับ SKU เดิม และ ชื่อสินค้า (ระบบจะนำแต่ละแถวไปสร้าง 3 ช่องทางให้เองอัตโนมัติ)")
+        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ที่มีคอลัมน์สำหรับ SKU เดิม และ ชื่อสินค้า (ระบบจะนำแต่ละแถวไปสร้างครบทั้ง 3 ช่องทางให้เองอัตโนมัติ)")
