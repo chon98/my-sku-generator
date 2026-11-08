@@ -77,7 +77,8 @@ with tab1:
         
         if not has_error and len(manual_results) > 0:
             df_manual_res = pd.DataFrame(manual_results)
-            df_manual_res = df_manual_res.sort_values(by=['_Sort_Code', 'SKU เดิม']).reset_index(drop=True)
+            # แก้ไขจุดนี้: จัดเรียงตามกลุ่มสินค้า (SKU เดิม) ก่อน แล้วตามด้วยรหัสช่องทาง (01 -> 02 -> 03)
+            df_manual_res = df_manual_res.sort_values(by=['SKU เดิม', '_Sort_Code']).reset_index(drop=True)
             output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
             df_manual_final = df_manual_res[output_cols]
             
@@ -87,7 +88,7 @@ with tab1:
             all_new_skus_text = "\n".join(df_manual_final["New_Product_Code"].tolist())
             st.code(all_new_skus_text, language="text")
             
-            st.write("📊 **ตารางสรุปรายละเอียด (เรียงลำดับคอลัมน์เรียบร้อย):**")
+            st.write("📊 **ตารางสรุปรายละเอียด (จัดเรียงตามรายการสินค้าเรียบร้อย):**")
             st.dataframe(df_manual_final, use_container_width=True)
             
             buffer_manual = io.BytesIO()
@@ -107,7 +108,6 @@ with tab1:
 with tab2:
     st.subheader("📥 ดาวน์โหลดไฟล์เทมเพลตสำหรับใช้งาน")
     
-    # สร้างข้อมูล Template
     template_data = {
         "SKU เดิม": ["PROD001", "PROD002"],
         "ชื่อสินค้า": ["ชานม", "กาแฟ"]
@@ -163,13 +163,14 @@ with tab2:
                         expanded_rows.append(new_row)
                 
                 df_result = pd.DataFrame(expanded_rows)
-                df_result = df_result.sort_values(by=['_Sort_Code', '_Sku_Old']).reset_index(drop=True)
+                # แก้ไขจุดนี้: จัดเรียงตามกลุ่มสินค้าเดิมก่อน จากนั้นยึดเรียงช่องทาง EI -> TA -> DL ต่อท้ายในสินค้านั้นๆ
+                df_result = df_result.sort_values(by=['_Sku_Old', '_Sort_Code']).reset_index(drop=True)
                 
                 output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
                 df_final_export = df_result[output_cols]
                 
                 st.success("🎉 ระบบแตกไฟล์ข้อมูลและสร้างรหัสทุกช่องทางการขายเสร็จเรียบร้อย!")
-                st.write("📋 **ผลลัพธ์ข้อมูลใหม่ (เรียงลำดับคอลัมน์เรียบร้อย):**")
+                st.write("📋 **ผลลัพธ์ข้อมูลใหม่ (จัดเรียงตามรายการสินค้าเรียบร้อย):**")
                 st.dataframe(df_final_export, use_container_width=True)
                 
                 buffer = io.BytesIO()
