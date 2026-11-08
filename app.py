@@ -11,22 +11,20 @@ channel_map = {
     'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
-tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเอง (Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
+tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเอง (Manual / Bulk Text)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
 with tab1:
-    st.subheader("กรอกข้อมูลสินค้าเพื่อสร้างรหัส SKU")
+    st.subheader("กรอกข้อมูลสินค้าเพื่อสร้างรหัส SKU (รองรับการใส่หลายรายการ)")
     
     with st.form("manual_form", clear_on_submit=False):
-        col_sku, col_name, col_channel = st.columns(3)
+        # เปลี่ยนเป็น text_area เพื่อให้กดขึ้นบรรทัดใหม่พิมพ์ได้หลายรายการ
+        sku_input = st.text_area("รหัส SKU เดิม (หากมีหลายรายการ ให้คั่นด้วยเครื่องหมายจุลภาค (,) หรือ เคาะขึ้นบรรทัดใหม่)", 
+                                 placeholder="ตัวอย่าง:\nPROD001\nPROD002, PROD003").strip()
         
-        with col_sku:
-            sku_input = st.text_input("รหัส SKU เดิม (เช่น PROD001)", placeholder="กรอกรหัส SKU").strip()
-        with col_name:
-            product_name = st.text_input("ชื่อสินค้า (เช่น ชานม)", placeholder="กรอกชื่อสินค้า").strip()
-        with col_channel:
-            # เพิ่มตัวเลือก "ทุกช่องทางการขาย" เข้าไปใน List
-            channel_options = ["ทุกช่องทางการขาย"] + list(channel_map.keys())
-            channel_input = st.selectbox("เลือกช่องทางการขาย", options=channel_options, key="manual_channel")
+        product_name = st.text_input("ชื่อสินค้า (เช่น ชานม)", placeholder="กรอกชื่อสินค้า").strip()
+        
+        channel_options = ["ทุกช่องทางการขาย"] + list(channel_map.keys())
+        channel_input = st.selectbox("เลือกช่องทางการขาย", options=channel_options, key="manual_channel")
             
         submit_button = st.form_submit_button(label="⚡ สร้างรหัส SKU")
 
@@ -34,34 +32,47 @@ with tab1:
         if not sku_input or not product_name:
             st.error("⚠️ กรุณากรอกรหัส SKU และชื่อสินค้าให้ครบถ้วน")
         else:
+            # จัดการแยกรายการ SKU ที่พิมพ์เข้ามาด้วยการขึ้นบรรทัดใหม่ หรือ เครื่องหมายจุลภาค
+            raw_skus = sku_input.replace('\n', ',').split(',')
+            sku_list = [sku.strip() for sku in raw_skus if sku.strip()]
+            
             manual_results = []
             
-            # กรณีเลือกทำทุกช่องทาง
-            if channel_input == "ทุกช่องทางการขาย":
-                for channel, info in channel_map.items():
-                    new_sku = f"{sku_input}{info['code']}{info['abbr']}"
+            for single_sku in sku_list:
+                # กรณีเลือกทำทุกช่องทาง
+                if channel_input == "ทุกช่องทางการขาย":
+                    for channel, info in channel_map.items():
+                        new_sku = f"{single_sku}{info['code']}{info['abbr']}"
+                        manual_results.append({
+                            "SKU เดิม": single_sku,
+                            "ชื่อสินค้า": product_name,
+                            "ช่องทางการขาย": channel,
+                            "รหัสสินค้าใหม่": new_sku
+                        })
+                # กรณีเลือกช่องทางใดช่องทางหนึ่งเจาะจง
+                else:
+                    info = channel_map[channel_input]
+                    new_sku = f"{single_sku}{info['code']}{info['abbr']}"
                     manual_results.append({
-                        "SKU เดิม": sku_input,
+                        "SKU เดิม": single_sku,
                         "ชื่อสินค้า": product_name,
-                        "ช่องทางการขาย": channel,
+                        "ช่องทางการขาย": channel_input,
                         "รหัสสินค้าใหม่": new_sku
                     })
-                st.success("🎉 สร้างรหัสสินค้าครบทุกช่องทางการขายสำเร็จ!")
             
-            # กรณีเลือกช่องทางใดช่องทางหนึ่งเจาะจง
-            else:
-                info = channel_map[channel_input]
-                new_sku = f"{sku_input}{info['code']}{info['abbr']}"
-                manual_results.append({
-                    "SKU เดิม": sku_input,
-                    "ชื่อสินค้า": product_name,
-                    "ช่องทางการขาย": channel_input,
-                    "รหัสสินค้าใหม่": new_sku
-                })
-                st.success(f"🎉 สร้างรหัสสินค้าสำหรับ {channel_input} สำเร็จ!")
+            st.success(f"🎉 สร้างรหัสสินค้าสำเร็จทั้งหมด {len(manual_results)} รายการ!")
             
+            # วนลูปแสดงผลลัพธ์พร้อมปุ่มก๊อปปี้แบบง่ายๆ ของ Streamlit (st.code จะมีปุ่ม Copy ในตัวให้คลิกที่มุมขวาบนทันที)
+            st.write("📋 **รหัสสินค้าใหม่ที่สร้างขึ้น (คลิกไอคอนสี่เหลี่ยมซ้อนกันที่มุมขวาบนของกล่องเพื่อคัดลอกได้เลย):**")
+            
+            # รวมรหัสสินค้าทั้งหมดคั่นด้วยการขึ้นบรรทัดใหม่เพื่อให้ก๊อปปี้ทีเดียวได้ทั้งหมด
+            all_new_skus_text = "\n".join([item["รหัสสินค้าใหม่"] for item in manual_results])
+            st.code(all_new_skus_text, language="text")
+            
+            # แสดงตารางสรุปด้านล่างข้อมูล
+            st.write("📊 **ตารางสรุปรายละเอียด:**")
             df_manual_res = pd.DataFrame(manual_results)
-            st.table(df_manual_res)
+            st.dataframe(df_manual_res, use_container_width=True)
 
 with tab2:
     st.subheader("นำเข้าไฟล์ข้อมูลเพื่อแตกรหัสสินค้าเป็นทุกช่องทางการขาย")
