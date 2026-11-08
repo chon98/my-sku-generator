@@ -47,12 +47,10 @@ tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบห�
 with tab1:
     st.subheader("📝 ระบุข้อมูลสินค้าแยกตามรายการ")
     
-    # ใช้ Session State เพื่อเก็บจำนวนแถวสินค้าที่ผู้ใช้งานต้องการเพิ่ม
     if 'num_products' not in st.session_state:
         st.session_state.num_products = 1
 
-    # ปุ่มสำหรับกดเพิ่มฟอร์มสินค้าแถวใหม่ลงมาด้านล่าง
-    col_btn1, col_btn2 = st.columns([1, 6])
+    col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
         if st.button("➕ เพิ่มรายการสินค้า"):
             st.session_state.num_products += 1
@@ -64,12 +62,11 @@ with tab1:
 
     st.write("")
     
-    # สร้างโครงสร้างฟอร์มรับข้อมูล
     manual_data_inputs = []
     
     for i in range(st.session_state.num_products):
         st.markdown(f"##### 📦 สินค้ารายการที่ {i+1}")
-        c1, c2, c3 = st.columns([3, 4, 5])
+        c1, c2, c3 = st.columns(3)
         
         with c1:
             sku_val = st.text_input(f"รหัส SKU เดิม", key=f"sku_{i}", placeholder="เช่น PROD001").strip()
@@ -84,14 +81,12 @@ with tab1:
             )
         st.markdown("---")
         
-        # เก็บค่าที่กรอกลงตัวแปรลิสต์
         manual_data_inputs.append({
             'sku': sku_val,
             'name': name_val,
             'channels': channels_val
         })
 
-    # ปุ่มประมวลผลข้อมูลที่กรอกทั้งหมด
     if st.button("⚡ เริ่มสร้างรหัส SKU ทั้งหมดจากรายการด้านบน", type="primary", key="btn_process_manual"):
         manual_results = []
         has_error = False
@@ -101,11 +96,9 @@ with tab1:
             p_name = item['name']
             channels_input = item['channels']
             
-            # ข้ามแถวที่ไม่ได้กรอกอะไรเลย
             if not sku_old and not p_name:
                 continue
                 
-            # ตรวจสอบกรณีกรอกข้อมูลไม่ครบ
             if not sku_old or not p_name:
                 st.error(f"⚠️ รายการที่ {idx + 1} กรอกข้อมูลไม่ครบ กรุณาระบุทั้ง SKU เดิม และ ชื่อสินค้า")
                 has_error = True
@@ -116,7 +109,6 @@ with tab1:
                 has_error = True
                 break
                 
-            # แปลงค่าช่องทางขายที่เลือก
             selected_channels = []
             if "ทุกช่องทางการขาย" in channels_input:
                 selected_channels = list(channel_map.keys())
@@ -239,3 +231,18 @@ with tab2:
                 st.dataframe(df_final_export, use_container_width=True)
                 
                 buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                    df_final_export.to_excel(writer, index=False, sheet_name='All_Channels_SKU')
+                    style_excel_sheet(writer, 'All_Channels_SKU')
+                
+                st.download_button(
+                    label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (ครบทุกช่องทาง)",
+		        data=buffer.getvalue(),
+                    file_name="multi_channel_sku_products.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="btn_download_file_res"
+                )
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
+    else:
+        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ที่มีคอลัมน์สำหรับ SKU เดิม และ ชื่อสินค้า (ระบบจะนำแต่ละแถวไปสร้างครบทั้ง 3 ช่องทางให้เองอัตโนมัติ)")
