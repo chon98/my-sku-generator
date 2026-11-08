@@ -4,39 +4,14 @@ import io
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
-# 1. ตั้งค่าหน้าเว็บให้ทันสมัย
+# 1. ตั้งค่าหน้าเว็บ
 st.set_page_config(
     page_title="SKU Generator Pro", 
     page_icon="📦", 
-    layout="wide",
-    initial_sidebar_state="collapsed"
+    layout="wide"
 )
 
-# ตกแต่งสไตล์ CSS ให้ปุ่ม แท็บ และหน้าจอมีมิติและดูโมเดิร์นขึ้น
-st.markdown("""
-<style>
-    .main .block-container { padding-top: 2rem; }
-    h1 { color: #1F4E78; font-weight: 800; font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
-    .stTabs [data-baseweb="tab"] {
-        padding: 10px 20px;
-        background-color: #f0f2f6;
-        border-radius: 8px 8px 0px 0px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    .stTabs [aria-selected="true"] { background-color: #1F4E78 !important; color: white !important; }
-    div[data-testid="stForm"] {
-        border: 1px solid #e6e9ef;
-        border-radius: 12px;
-        padding: 2rem;
-        background-color: #ffffff;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# 2. คลังคำแปลระบบ 2 ภาษา (ไทย / อังกฤษ)
+# คลังคำแปลระบบ 2 ภาษา (ไทย / อังกฤษ)
 translation = {
     'TH': {
         'title': "📦 ระบบบริหารจัดการและสร้างรหัส SKU สินค้า",
@@ -108,8 +83,8 @@ translation = {
     }
 }
 
-# 3. ส่วนหัวข้อเว็บบอร์ดและปุ่มเปลี่ยนภาษา (สลับที่มุมขวาบนอย่างสวยงาม)
-header_left, header_right = st.columns([8, 2])
+# 2. จัดวางปุ่มเลือกภาษาและหัวข้อให้สมดุล
+header_left, header_right = st.columns([4, 1])
 with header_right:
     lang = st.selectbox("🌐 Language / ภาษา", options=["TH", "EN"], index=0)
 
@@ -117,7 +92,7 @@ lang_dict = translation[lang]
 
 with header_left:
     st.title(lang_dict['title'])
-    st.caption(lang_dict['subtitle'])
+    st.write(lang_dict['subtitle'])
 
 st.write("---")
 
@@ -146,7 +121,7 @@ def style_excel_sheet(writer, sheet_name):
         col_letter = get_column_letter(col.column)
         worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
-# 4. แท็บการใช้งานระบบ
+# 3. แท็บการใช้งานระบบ
 tab1, tab2 = st.tabs([lang_dict['tab1'], lang_dict['tab2']])
 
 # ==========================================
@@ -204,7 +179,6 @@ with tab1:
                         "_Sku_Old": sku_old
                     })
             else:
-                # ตรวจสอบการสลับภาษาของช้อยส์ช่องทางเดี่ยว
                 actual_channel = channel_input
                 info = channel_map.get(actual_channel, channel_map['Eat in'])
                 new_sku = f"{sku_old}{info['code']}{info['abbr']}"
@@ -218,3 +192,22 @@ with tab1:
         
         if not has_error and len(manual_results) > 0:
             df_manual_res = pd.DataFrame(manual_results)
+            df_manual_res = df_manual_res.sort_values(by=['_Sku_Old', '_Sort_Code']).reset_index(drop=True)
+            output_cols = [lang_dict['col_header_sku'], lang_dict['col_header_name'], lang_dict['col_header_chan']]
+            df_manual_final = df_manual_res[output_cols]
+            
+            st.success(lang_dict['success_gen'].format(len(df_manual_final)))
+            
+            st.write(lang_dict['copy_title'])
+            all_new_skus_text = "\n".join(df_manual_final[lang_dict['col_header_sku']].tolist())
+            st.code(all_new_skus_text, language="text")
+            
+            st.write(lang_dict['summary_title'])
+            st.dataframe(df_manual_final, use_container_width=True)
+            
+            buffer_manual = io.BytesIO()
+            with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
+                df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
+                style_excel_sheet(writer, 'Manual_SKU')
+            
+            st.download_button(
