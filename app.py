@@ -48,11 +48,13 @@ with tab1:
     st.subheader("📝 ตารางกรอกข้อมูลสินค้า")
     st.caption("💡 วิธีใช้งาน: ดับเบิ้ลคลิกเพื่อพิมพ์ข้อมูล / คลิกเลือกช่องทางการขาย (เลือกได้มากกว่า 1 ช่องทางพร้อมกัน) / กดปุ่ม (+ Add row) ด้านล่างสุดเพื่อเพิ่มแถวใหม่")
     
+    # กำหนดค่าเริ่มต้นให้กับคอลัมน์เลือกช่องทางการขายเป็น List เพื่อให้รองรับ Multi-select อัตโนมัติ
     init_data = [
         {"SKU เดิม": "", "ชื่อสินค้า": "", "เลือกช่องทางการขาย": ["Eat in"]}
     ]
     df_init = pd.DataFrame(init_data)
     
+    # แก้ไขจุดนี้: ใช้ตัวตั้งค่าเริ่มต้นของคอลัมน์ตารางให้รองรับ Multi-select โดยแก้บั๊กจากคำสั่งเดิม
     edited_df = st.data_editor(
         df_init,
         num_rows="dynamic",
@@ -60,7 +62,7 @@ with tab1:
         column_config={
             "SKU เดิม": st.column_config.TextColumn("รหัส SKU เดิม (เช่น PROD001)", required=True),
             "ชื่อสินค้า": st.column_config.TextColumn("ชื่อสินค้า (เช่น ชานม)", required=True),
-            "เลือกช่องทางการขาย": st.column_config.ListColumn(
+            "เลือกช่องทางการขาย": st.column_config.SelectboxColumn(
                 "เลือกช่องทางการขาย (เลือกได้หลายช่องทาง)",
                 options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
                 required=True
@@ -85,16 +87,19 @@ with tab1:
                 has_error = True
                 break
                 
-            if not channels_input or len(channels_input) == 0:
+            if not channels_input or (isinstance(channels_input, list) and len(channels_input) == 0):
                 st.error(f"⚠️ แถวที่ {index + 1} ยังไม่ได้เลือกช่องทางการขาย")
                 has_error = True
                 break
             
+            # ตรวจสอบว่าเป็น String เดี่ยว หรือเป็น List รายการจากการกดเลือกมาหลายตัว
+            channels_list = channels_input if isinstance(channels_input, list) else [channels_input]
+            
             selected_channels = []
-            if "ทุกช่องทางการขาย" in channels_input:
+            if "ทุกช่องทางการขาย" in channels_list:
                 selected_channels = list(channel_map.keys())
             else:
-                selected_channels = channels_input
+                selected_channels = channels_list
                 
             for channel in selected_channels:
                 info = channel_map.get(channel)
@@ -218,6 +223,7 @@ with tab2:
                     style_excel_sheet(writer, 'All_Channels_SKU')
                 
                 st.download_button(
+
                     label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (ครบทุกช่องทาง)",
                     data=buffer.getvalue(),
                     file_name="multi_channel_sku_products.xlsx",
