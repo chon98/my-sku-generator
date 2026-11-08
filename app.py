@@ -42,73 +42,116 @@ def style_excel_sheet(writer, sheet_name):
 tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายสินค้า (Manual Entry)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
 # ==========================================
-# แท็บที่ 1: กรอกข้อมูลเอง (แยกช่องชัดเจน + เลือกได้หลายช่องทาง)
+# แท็บที่ 1: กรอกข้อมูลเอง (ติดกันกระชับ + เลือกเลือกลบรายแถวได้)
 # ==========================================
 with tab1:
     st.subheader("📝 ระบุข้อมูลสินค้าแยกตามรายการ")
     
-    if 'num_products' not in st.session_state:
-        st.session_state.num_products = 1
+    # ใช้ session_state เก็บรายการสินค้าเป็นกลุ่ม Dict เพื่อให้ระบุตัวตนและลบรายชิ้นได้แม่นยำ
+    if 'product_items' not in st.session_state:
+        st.session_state.product_items = [{'id': 0, 'sku': '', 'name': '', 'channels': ['Eat in']}]
+    if 'next_id' not in st.session_state:
+        st.session_state.next_id = 1
 
-    col_btn1, col_btn2 = st.columns(2)
-    with col_btn1:
-        if st.button("➕ เพิ่มรายการสินค้า"):
-            st.session_state.num_products += 1
-            st.rerun()
-    with col_btn2:
-        if st.button("❌ ลบรายการล่าสุด") and st.session_state.num_products > 1:
-            st.session_state.num_products -= 1
-            st.rerun()
+    # ปุ่มสำหรับเพิ่มรายการใหม่
+    if st.button("➕ เพิ่มรายการสินค้า", key="add_item_btn"):
+        st.session_state.product_items.append({
+            'id': st.session_state.next_id,
+            'sku': '',
+            'name': '',
+            'channels': ['Eat in']
+        })
+        st.session_state.next_id += 1
+        st.rerun()
 
     st.write("")
     
-    manual_data_inputs = []
+    # อาเรย์ชั่วคราวเก็บค่าอัปเดตปัจจุบัน
+    updated_items = []
     
-    for i in range(st.session_state.num_products):
-        st.markdown(f"##### 📦 สินค้ารายการที่ {i+1}")
-        c1, c2, c3 = st.columns(3)
+    # วนลูปสร้างกล่องข้อความต่อกันแบบชิดกระชับ
+    for idx, item in enumerate(st.session_state.product_items):
+        item_id = item['id']
+        
+        # แบ่งเป็น 4 คอลัมน์ชิดกัน (3 ช่องกรอกข้อมูล + 1 ปุ่มลบ)
+        c1, c2, c3, c4 = st.columns([3, 3, 4, 1])
         
         with c1:
-            sku_val = st.text_input(f"รหัส SKU เดิม", key=f"sku_{i}", placeholder="เช่น PROD001").strip()
+            sku_val = st.text_input(
+                f"รหัส SKU เดิม #{idx+1}", 
+                value=item['sku'], 
+                key=f"sku_in_{item_id}", 
+                placeholder="เช่น PROD001",
+                label_visibility="collapsed" if idx > 0 else "visible"
+            ).strip()
         with c2:
-            name_val = st.text_input(f"ชื่อสินค้า", key=f"name_{i}", placeholder="เช่น ชานม").strip()
+            name_val = st.text_input(
+                f"ชื่อสินค้า #{idx+1}", 
+                value=item['name'], 
+                key=f"name_in_{item_id}", 
+                placeholder="เช่น ชานม",
+                label_visibility="collapsed" if idx > 0 else "visible"
+            ).strip()
         with c3:
             channels_val = st.multiselect(
-                f"ช่องทางการขาย",
+                f"ช่องทางการขาย #{idx+1}",
                 options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
-                default=["Eat in"],
-                key=f"channels_{i}"
+                default=item['channels'],
+                key=f"channels_in_{item_id}",
+                label_visibility="collapsed" if idx > 0 else "visible"
             )
-        st.markdown("---")
-        
-        manual_data_inputs.append({
-            'sku': sku_val,
-            'name': name_val,
-            'channels': channels_val
-        })
+        with c4:
+            # ดันปุ่มลบให้ตรงแนวกรณีที่มี Label บรรทัดแรก
+            if idx == 0:
+                st.write('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
+                
+            # ปุ่มลบเฉพาะรายการชิ้นนี้
+            if st.button("❌", key=f"del_btn_{item_id}", help="ลบรายการนี้"):
+                # ค้นหาและเอาออกจาก session_state ทันที
+                st.session_state.product_items = [x for x in st.session_state.product_items if x['id'] != item_id]
+                # ตรวจสอบไม่ให้รายการหมดเกลี้ยงหน้าจอ
+                if not st.session_state.product_items:
+                    st.session_state.product_items = [{'id': st.session_state.next_id, 'sku': '', 'name': '', 'channels': ['Eat in']}]
+                    st.session_state.next_id += 1
+                st.rerun()
+                
+        # อัปเดตข้อมูลล่าสุดเข้าสู่อาเรย์ชั่วคราว
+        item['sku'] = sku_val
+        item['name'] = name_val
+        item['channels'] = channels_val
+        updated_items.append(item)
 
+    # บันทึกข้อมูลที่กรอกค้างไว้กลับเข้าเซสชัน
+    st.session_state.product_items = updated_items
+
+    st.write("")
+    
+    # ปุ่มประมวลผลข้อมูลที่กรอกทั้งหมด
     if st.button("⚡ เริ่มสร้างรหัส SKU ทั้งหมดจากรายการด้านบน", type="primary", key="btn_process_manual"):
         manual_results = []
         has_error = False
         
-        for idx, item in enumerate(manual_data_inputs):
+        for index, item in enumerate(st.session_state.product_items):
             sku_old = item['sku']
             p_name = item['name']
             channels_input = item['channels']
             
+            # ข้ามแถวที่ไม่ได้กรอกข้อมูล
             if not sku_old and not p_name:
                 continue
                 
+            # ตรวจสอบกรณีกรอกข้อมูลไม่ครบ
             if not sku_old or not p_name:
-                st.error(f"⚠️ รายการที่ {idx + 1} กรอกข้อมูลไม่ครบ กรุณาระบุทั้ง SKU เดิม และ ชื่อสินค้า")
+                st.error(f"⚠️ รายการแถวที่ {index + 1} กรอกข้อมูลไม่ครบ กรุณาระบุทั้ง SKU เดิม และ ชื่อสินค้า")
                 has_error = True
                 break
                 
             if not channels_input:
-                st.error(f"⚠️ รายการที่ {idx + 1} ยังไม่ได้เลือกช่องทางการขาย")
+                st.error(f"⚠️ รายการแถวที่ {index + 1} ยังไม่ได้เลือกช่องทางการขาย")
                 has_error = True
                 break
                 
+            # แตกประเภทช่องทางขาย
             selected_channels = []
             if "ทุกช่องทางการขาย" in channels_input:
                 selected_channels = list(channel_map.keys())
@@ -199,6 +242,7 @@ with tab2:
             with col1:
                 sku_col = st.selectbox("เลือกคอลัมน์ที่เป็น [SKUเดิม]", options=columns, key="import_sku")
             with col2:
+
                 name_col = st.selectbox("เลือกคอลัมน์ที่เป็น [ชื่อสินค้า]", options=columns, key="import_name")
                 
             if st.button("⚡ เริ่มแตกไฟล์และสร้างรหัส SKU ทั้งหมด", type="primary"):
