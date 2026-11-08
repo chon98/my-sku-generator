@@ -83,8 +83,8 @@ translation = {
     }
 }
 
-# 2. จัดวางส่วนหัวและตัวสลับภาษา
-header_left, header_right = st.columns()
+# 2. แก้ไขจุดนี้: ใส่เลข 2 เพื่อแบ่งหน้าจอเป็น 2 คอลัมน์สำหรับหัวเว็บและตัวเลือกภาษา
+header_left, header_right = st.columns(2)
 with header_right:
     lang = st.selectbox("🌐 Language / ภาษา", options=["TH", "EN"], index=0)
 
@@ -209,5 +209,3 @@ with tab1:
             with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
                 style_excel_sheet(writer, 'Manual_SKU')
-            
-            st.download_button
