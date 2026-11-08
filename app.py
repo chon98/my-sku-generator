@@ -17,8 +17,7 @@ st.write("---")
 channel_map = {
     'Eat in': {'code': '01', 'abbr': 'EI'},
     'Take away': {'code': '02', 'abbr': 'TA'},
-    'Delivery': {'code': '03', 'abbr': 'DL'},
-	'Grab food': {'code': '04', 'abbr': 'GF'}
+    'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
 # ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด
@@ -43,18 +42,16 @@ def style_excel_sheet(writer, sheet_name):
 tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายสินค้า (Manual Entry)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
 # ==========================================
-# แท็บที่ 1: กรอกข้อมูลเอง (ติดกันกระชับ + เลือกเลือกลบรายแถวได้)
+# แท็บที่ 1: กรอกข้อมูลเอง
 # ==========================================
 with tab1:
     st.subheader("📝 ระบุข้อมูลสินค้าแยกตามรายการ")
     
-    # ใช้ session_state เก็บรายการสินค้าเป็นกลุ่ม Dict เพื่อให้ระบุตัวตนและลบรายชิ้นได้แม่นยำ
     if 'product_items' not in st.session_state:
         st.session_state.product_items = [{'id': 0, 'sku': '', 'name': '', 'channels': ['Eat in']}]
     if 'next_id' not in st.session_state:
         st.session_state.next_id = 1
 
-    # ปุ่มสำหรับเพิ่มรายการใหม่
     if st.button("➕ เพิ่มรายการสินค้า", key="add_item_btn"):
         st.session_state.product_items.append({
             'id': st.session_state.next_id,
@@ -67,14 +64,11 @@ with tab1:
 
     st.write("")
     
-    # อาเรย์ชั่วคราวเก็บค่าอัปเดตปัจจุบัน
     updated_items = []
     
-    # วนลูปสร้างกล่องข้อความต่อกันแบบชิดกระชับ
     for idx, item in enumerate(st.session_state.product_items):
         item_id = item['id']
         
-        # แบ่งเป็น 4 คอลัมน์ชิดกัน (3 ช่องกรอกข้อมูล + 1 ปุ่มลบ)
         c1, c2, c3, c4 = st.columns([3, 3, 4, 1])
         
         with c1:
@@ -94,40 +88,33 @@ with tab1:
                 label_visibility="collapsed" if idx > 0 else "visible"
             ).strip()
         with c3:
+            # แก้ไขจุดนี้: ถอดคำว่า "ทุกช่องทางการขาย" ออกจากตัวเลือก ให้เหลือแค่รายการหลักในคลังระบบ
             channels_val = st.multiselect(
                 f"ช่องทางการขาย #{idx+1}",
-                options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
+                options=list(channel_map.keys()),
                 default=item['channels'],
                 key=f"channels_in_{item_id}",
                 label_visibility="collapsed" if idx > 0 else "visible"
             )
         with c4:
-            # ดันปุ่มลบให้ตรงแนวกรณีที่มี Label บรรทัดแรก
             if idx == 0:
                 st.write('<div style="margin-top:28px;"></div>', unsafe_allow_html=True)
                 
-            # ปุ่มลบเฉพาะรายการชิ้นนี้
             if st.button("❌", key=f"del_btn_{item_id}", help="ลบรายการนี้"):
-                # ค้นหาและเอาออกจาก session_state ทันที
                 st.session_state.product_items = [x for x in st.session_state.product_items if x['id'] != item_id]
-                # ตรวจสอบไม่ให้รายการหมดเกลี้ยงหน้าจอ
                 if not st.session_state.product_items:
                     st.session_state.product_items = [{'id': st.session_state.next_id, 'sku': '', 'name': '', 'channels': ['Eat in']}]
                     st.session_state.next_id += 1
                 st.rerun()
                 
-        # อัปเดตข้อมูลล่าสุดเข้าสู่อาเรย์ชั่วคราว
         item['sku'] = sku_val
         item['name'] = name_val
         item['channels'] = channels_val
         updated_items.append(item)
 
-    # บันทึกข้อมูลที่กรอกค้างไว้กลับเข้าเซสชัน
     st.session_state.product_items = updated_items
-
     st.write("")
     
-    # ปุ่มประมวลผลข้อมูลที่กรอกทั้งหมด
     if st.button("⚡ เริ่มสร้างรหัส SKU ทั้งหมดจากรายการด้านบน", type="primary", key="btn_process_manual"):
         manual_results = []
         has_error = False
@@ -137,11 +124,9 @@ with tab1:
             p_name = item['name']
             channels_input = item['channels']
             
-            # ข้ามแถวที่ไม่ได้กรอกข้อมูล
             if not sku_old and not p_name:
                 continue
                 
-            # ตรวจสอบกรณีกรอกข้อมูลไม่ครบ
             if not sku_old or not p_name:
                 st.error(f"⚠️ รายการแถวที่ {index + 1} กรอกข้อมูลไม่ครบ กรุณาระบุทั้ง SKU เดิม และ ชื่อสินค้า")
                 has_error = True
@@ -152,14 +137,7 @@ with tab1:
                 has_error = True
                 break
                 
-            # แตกประเภทช่องทางขาย
-            selected_channels = []
-            if "ทุกช่องทางการขาย" in channels_input:
-                selected_channels = list(channel_map.keys())
-            else:
-                selected_channels = channels_input
-                
-            for channel in selected_channels:
+            for channel in channels_input:
                 info = channel_map.get(channel)
                 if info:
                     new_sku = f"{sku_old}{info['code']}{info['abbr']}"
@@ -243,7 +221,6 @@ with tab2:
             with col1:
                 sku_col = st.selectbox("เลือกคอลัมน์ที่เป็น [SKUเดิม]", options=columns, key="import_sku")
             with col2:
-
                 name_col = st.selectbox("เลือกคอลัมน์ที่เป็น [ชื่อสินค้า]", options=columns, key="import_name")
                 
             if st.button("⚡ เริ่มแตกไฟล์และสร้างรหัส SKU ทั้งหมด", type="primary"):
@@ -263,6 +240,7 @@ with tab2:
                             '_Sort_Code': info['code'],
                             '_Sku_Old': sku_old
                         }
+
                         expanded_rows.append(new_row)
                 
                 df_result = pd.DataFrame(expanded_rows)
