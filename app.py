@@ -4,7 +4,7 @@ import io
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
-# 1. ตั้งค่าหน้าเว็บ
+# 1. ตั้งค่าหน้าเว็บให้รองรับธีมของระบบโดยสมบูรณ์
 st.set_page_config(
     page_title="SKU Generator Pro", 
     page_icon="📦", 
@@ -83,8 +83,8 @@ translation = {
     }
 }
 
-# 2. จัดวางปุ่มเลือกภาษาและหัวข้อ
-header_left, header_right = st.columns()
+# 2. จัดวางส่วนหัวของเว็บไซต์และเมนูสลับภาษาอย่างเป็นระเบียบ
+header_left, header_right = st.columns([3, 1])
 with header_right:
     lang = st.selectbox("🌐 Language / ภาษา", options=["TH", "EN"], index=0)
 
@@ -121,7 +121,7 @@ def style_excel_sheet(writer, sheet_name):
         col_letter = get_column_letter(col.column)
         worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
-# 3. แท็บการใช้งานระบบ
+# 3. แท็บสำหรับการประมวลผลข้อมูล
 tab1, tab2 = st.tabs([lang_dict['tab1'], lang_dict['tab2']])
 
 # ==========================================
@@ -208,6 +208,3 @@ with tab1:
             buffer_manual = io.BytesIO()
             with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
-                style_excel_sheet(writer, 'Manual_SKU')
-            
-            st.download_button(
