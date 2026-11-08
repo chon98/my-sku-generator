@@ -77,7 +77,6 @@ with tab1:
         
         if not has_error and len(manual_results) > 0:
             df_manual_res = pd.DataFrame(manual_results)
-            # เรียงลำดับตามช่องทางการขาย และ SKU เดิม จากนั้นจัดคอลัมน์ตามลำดับที่ต้องการ
             df_manual_res = df_manual_res.sort_values(by=['_Sort_Code', 'SKU เดิม']).reset_index(drop=True)
             output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
             df_manual_final = df_manual_res[output_cols]
@@ -91,7 +90,6 @@ with tab1:
             st.write("📊 **ตารางสรุปรายละเอียด (เรียงลำดับคอลัมน์เรียบร้อย):**")
             st.dataframe(df_manual_final, use_container_width=True)
             
-            # เพิ่มปุ่ม Export Excel สำหรับฝั่ง Manual ให้ด้วย
             buffer_manual = io.BytesIO()
             with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
@@ -107,7 +105,28 @@ with tab1:
             st.warning("⚠️ ไม่พบข้อมูลในตาราง กรุณากรอกรหัสสินค้าก่อนกดปุ่ม")
 
 with tab2:
-    st.subheader("นำเข้าไฟล์ข้อมูลเพื่อแตกรหัสสินค้าเป็นทุกช่องทางการขาย")
+    st.subheader("📥 ดาวน์โหลดไฟล์เทมเพลตสำหรับใช้งาน")
+    
+    # สร้างข้อมูล Template
+    template_data = {
+        "SKU เดิม": ["PROD001", "PROD002"],
+        "ชื่อสินค้า": ["ชานม", "กาแฟ"]
+    }
+    df_template = pd.DataFrame(template_data)
+    
+    buffer_template = io.BytesIO()
+    with pd.ExcelWriter(buffer_template, engine='openpyxl') as writer:
+        df_template.to_excel(writer, index=False, sheet_name='Template')
+        
+    st.download_button(
+        label="📥 ดาวน์โหลดไฟล์เทมเพลต Excel (.xlsx)",
+        data=buffer_template.getvalue(),
+        file_name="sku_import_template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    
+    st.write("---")
+    st.subheader("📤 นำเข้าไฟล์ข้อมูลเพื่อแตกรหัสสินค้าเป็นทุกช่องทางการขาย")
     uploaded_file = st.file_uploader("เลือกไฟล์ Excel ของคุณ (รองรับ .xlsx)", type=["xlsx"])
 
     if uploaded_file is not None:
@@ -144,7 +163,6 @@ with tab2:
                         expanded_rows.append(new_row)
                 
                 df_result = pd.DataFrame(expanded_rows)
-                # เรียงลำดับตามช่องทางการขาย และ SKU เดิม จากนั้นจัดคอลัมน์ตามลำดับที่ต้องการ
                 df_result = df_result.sort_values(by=['_Sort_Code', '_Sku_Old']).reset_index(drop=True)
                 
                 output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
