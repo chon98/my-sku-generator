@@ -20,7 +20,7 @@ channel_map = {
     'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
-# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด (แก้ไขวิธีดึงรหัสตัวอักษรคอลัมน์แล้ว)
+# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด
 def style_excel_sheet(writer, sheet_name):
     worksheet = writer.sheets[sheet_name]
     worksheet.freeze_panes = "A2"
@@ -34,94 +34,137 @@ def style_excel_sheet(writer, sheet_name):
             cell.font = header_font
             cell.alignment = header_alignment
             
-    # แก้ไขจุดนี้: ใช้ enumerate นับลำดับตัวเลขคอลัมน์ (เริ่มจาก 1) แทนการใช้คำสั่ง col.column ป้องกันการเกิดข้อผิดพลาดประเภท Tuple
     for idx, col in enumerate(worksheet.columns, start=1):
         max_len = max(len(str(cell.value or '')) for cell in col)
         col_letter = get_column_letter(idx)
         worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
-tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายช่องทาง (Bulk Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
+tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายสินค้า (Manual Entry)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
 # ==========================================
-# แท็บที่ 1: กรอกข้อมูลเอง (รองรับพิมพ์หลายรายการ + เลือกหลายช่องทาง)
+# แท็บที่ 1: กรอกข้อมูลเอง (แยกช่องชัดเจน + เลือกได้หลายช่องทาง)
 # ==========================================
 with tab1:
-    st.subheader("📝 กรอกข้อมูลสินค้าเพื่อสร้างรหัส SKU")
+    st.subheader("📝 ระบุข้อมูลสินค้าแยกตามรายการ")
     
-    with st.form("manual_form", clear_on_submit=False):
-        sku_input = st.text_area(
-            "รหัส SKU เดิม (หากมีหลายรายการ ให้คั่นด้วยเครื่องหมายจุลภาค (,) หรือ เคาะขึ้นบรรทัดใหม่)", 
-            placeholder="ตัวอย่าง:\nPROD001\nPROD002, PROD003"
-        ).strip()
-        
-        product_name = st.text_input("ชื่อสินค้า (เช่น ชานม)", placeholder="กรอกชื่อสินค้า").strip()
-        
-        channels_input = st.multiselect(
-            "เลือกช่องทางการขายที่ต้องการ (เลือกได้มากกว่า 1 ช่องทางพร้อมกัน)",
-            options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
-            default=["Eat in"]
-        )
-            
-        submit_button = st.form_submit_button(label="⚡ เริ่มสร้างรหัส SKU")
+    # ใช้ Session State เพื่อเก็บจำนวนแถวสินค้าที่ผู้ใช้งานต้องการเพิ่ม
+    if 'num_products' not in st.session_state:
+        st.session_state.num_products = 1
 
-    if submit_button:
-        if not sku_input or not product_name:
-            st.error("⚠️ กรุณากรอกรหัส SKU และชื่อสินค้าให้ครบถ้วน")
-        elif not channels_input:
-            st.error("⚠️ กรุณาเลือกช่องทางการขายอย่างน้อย 1 ช่องทาง")
-        else:
-            raw_skus = sku_input.replace('\n', ',').split(',')
-            sku_list = [sku.strip() for sku in raw_skus if sku.strip()]
+    # ปุ่มสำหรับกดเพิ่มฟอร์มสินค้าแถวใหม่ลงมาด้านล่าง
+    col_btn1, col_btn2 = st.columns([1, 6])
+    with col_btn1:
+        if st.button("➕ เพิ่มรายการสินค้า"):
+            st.session_state.num_products += 1
+            st.rerun()
+    with col_btn2:
+        if st.button("❌ ลบรายการล่าสุด") and st.session_state.num_products > 1:
+            st.session_state.num_products -= 1
+            st.rerun()
+
+    st.write("")
+    
+    # สร้างโครงสร้างฟอร์มรับข้อมูล
+    manual_data_inputs = []
+    
+    for i in range(st.session_state.num_products):
+        st.markdown(f"##### 📦 สินค้ารายการที่ {i+1}")
+        c1, c2, c3 = st.columns([3, 4, 5])
+        
+        with c1:
+            sku_val = st.text_input(f"รหัส SKU เดิม", key=f"sku_{i}", placeholder="เช่น PROD001").strip()
+        with c2:
+            name_val = st.text_input(f"ชื่อสินค้า", key=f"name_{i}", placeholder="เช่น ชานม").strip()
+        with c3:
+            channels_val = st.multiselect(
+                f"ช่องทางการขาย",
+                options=["ทุกช่องทางการขาย"] + list(channel_map.keys()),
+                default=["Eat in"],
+                key=f"channels_{i}"
+            )
+        st.markdown("---")
+        
+        # เก็บค่าที่กรอกลงตัวแปรลิสต์
+        manual_data_inputs.append({
+            'sku': sku_val,
+            'name': name_val,
+            'channels': channels_val
+        })
+
+    # ปุ่มประมวลผลข้อมูลที่กรอกทั้งหมด
+    if st.button("⚡ เริ่มสร้างรหัส SKU ทั้งหมดจากรายการด้านบน", type="primary", key="btn_process_manual"):
+        manual_results = []
+        has_error = False
+        
+        for idx, item in enumerate(manual_data_inputs):
+            sku_old = item['sku']
+            p_name = item['name']
+            channels_input = item['channels']
             
-            manual_results = []
-            
+            # ข้ามแถวที่ไม่ได้กรอกอะไรเลย
+            if not sku_old and not p_name:
+                continue
+                
+            # ตรวจสอบกรณีกรอกข้อมูลไม่ครบ
+            if not sku_old or not p_name:
+                st.error(f"⚠️ รายการที่ {idx + 1} กรอกข้อมูลไม่ครบ กรุณาระบุทั้ง SKU เดิม และ ชื่อสินค้า")
+                has_error = True
+                break
+                
+            if not channels_input:
+                st.error(f"⚠️ รายการที่ {idx + 1} ยังไม่ได้เลือกช่องทางการขาย")
+                has_error = True
+                break
+                
+            # แปลงค่าช่องทางขายที่เลือก
             selected_channels = []
             if "ทุกช่องทางการขาย" in channels_input:
                 selected_channels = list(channel_map.keys())
             else:
                 selected_channels = channels_input
+                
+            for channel in selected_channels:
+                info = channel_map.get(channel)
+                if info:
+                    new_sku = f"{sku_old}{info['code']}{info['abbr']}"
+                    manual_results.append({
+                        "New_Product_Code": new_sku,
+                        "ชื่อสินค้า": p_name,
+                        "ช่องทางการขาย": channel,
+                        "_Sort_Code": info['code'],
+                        "SKU เดิม": sku_old
+                    })
+                    
+        if not has_error and len(manual_results) > 0:
+            df_manual_res = pd.DataFrame(manual_results)
+            df_manual_res = df_manual_res.sort_values(by=['SKU เดิม', '_Sort_Code']).reset_index(drop=True)
             
-            for single_sku in sku_list:
-                for channel in selected_channels:
-                    info = channel_map.get(channel)
-                    if info:
-                        new_sku = f"{single_sku}{info['code']}{info['abbr']}"
-                        manual_results.append({
-                            "New_Product_Code": new_sku,
-                            "ชื่อสินค้า": product_name,
-                            "ช่องทางการขาย": channel,
-                            "_Sort_Code": info['code'],
-                            "SKU เดิม": single_sku
-                        })
+            output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
+            df_manual_final = df_manual_res[output_cols]
             
-            if len(manual_results) > 0:
-                df_manual_res = pd.DataFrame(manual_results)
-                df_manual_res = df_manual_res.sort_values(by=['SKU เดิม', '_Sort_Code']).reset_index(drop=True)
-                
-                output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
-                df_manual_final = df_manual_res[output_cols]
-                
-                st.success(f"🎉 สร้างรหัสสินค้าสำเร็จทั้งหมด {len(df_manual_final)} รายการ!")
-                
-                st.write("📋 **รหัสสินค้าใหม่ทั้งหมด (คลิกไอคอนสี่เหลี่ยมซ้อนกันที่มุมขวาบนของกล่องเพื่อคัดลอกทั้งหมด):**")
-                all_new_skus_text = "\n".join(df_manual_final["New_Product_Code"].tolist())
-                st.code(all_new_skus_text, language="text")
-                
-                st.write("📊 **ตารางสรุปรายละเอียด:**")
-                st.dataframe(df_manual_final, use_container_width=True)
-                
-                buffer_manual = io.BytesIO()
-                with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
-                    df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
-                    style_excel_sheet(writer, 'Manual_SKU')
-                
-                st.download_button(
-                    label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (จากตารางกรอกเอง)",
-                    data=buffer_manual.getvalue(),
-                    file_name="manual_sku_products.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="btn_download_manual_res"
-                )
+            st.success(f"🎉 สร้างรหัสสินค้าสำเร็จทั้งหมด {len(df_manual_final)} รายการ!")
+            
+            st.write("📋 **รหัสสินค้าใหม่ทั้งหมด (คลิกไอคอนสี่เหลี่ยมซ้อนกันที่มุมขวาบนของกล่องเพื่อคัดลอกทั้งหมด):**")
+            all_new_skus_text = "\n".join(df_manual_final["New_Product_Code"].tolist())
+            st.code(all_new_skus_text, language="text")
+            
+            st.write("📊 **ตารางสรุปรายละเอียด:**")
+            st.dataframe(df_manual_final, use_container_width=True)
+            
+            buffer_manual = io.BytesIO()
+            with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
+                df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
+                style_excel_sheet(writer, 'Manual_SKU')
+            
+            st.download_button(
+                label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (จากรายการที่กรอก)",
+                data=buffer_manual.getvalue(),
+                file_name="manual_sku_products.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="btn_download_manual_res"
+            )
+        elif not has_error and len(manual_results) == 0:
+            st.warning("⚠️ ไม่พบข้อมูลสินค้า กรุณากรอกข้อมูลสินค้าในช่องด้านบนอย่างน้อย 1 รายการ")
 
 # ==========================================
 # แท็บที่ 2: อัปโหลดไฟล์ Excel
@@ -196,18 +239,3 @@ with tab2:
                 st.dataframe(df_final_export, use_container_width=True)
                 
                 buffer = io.BytesIO()
-                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                    df_final_export.to_excel(writer, index=False, sheet_name='All_Channels_SKU')
-                    style_excel_sheet(writer, 'All_Channels_SKU')
-                
-                st.download_button(
-                    label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (ครบทุกช่องทาง)",
-                    data=buffer.getvalue(),
-                    file_name="multi_channel_sku_products.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="btn_download_file_res"
-                )
-        except Exception as e:
-            st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
-    else:
-        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ที่มีคอลัมน์สำหรับ SKU เดิม และ ชื่อสินค้า (ระบบจะนำแต่ละแถวไปสร้างครบทั้ง 3 ช่องทางให้เองอัตโนมัติ)")
