@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import io
+from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.utils import get_column_letter
 
 st.set_page_config(page_title="SKU Generator Pro", layout="wide")
 st.title("📦 ระบบสร้างรหัส SKU สินค้าตามช่องทางการขาย")
@@ -10,6 +12,28 @@ channel_map = {
     'Take away': {'code': '02', 'abbr': 'TA'},
     'Delivery': {'code': '03', 'abbr': 'DL'}
 }
+
+# ฟังก์ชันตกแต่งหัวข้อตารางและขยายขนาดคอลัมน์อัตโนมัติ
+def style_excel_sheet(writer, sheet_name):
+    worksheet = writer.sheets[sheet_name]
+    # สีพื้นหลังสีน้ำเงินเข้ม (Hex: 1F4E78)
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    # ฟอนต์ตัวหนา สีขาว (Hex: FFFFFF)
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    
+    # ตกแต่งแถวที่ 1 (Header Row)
+    for col in worksheet.iter_cols(min_row=1, max_row=1):
+        for cell in col:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+            
+    # ปรับความกว้างคอลัมน์อัตโนมัติตามความยาวตัวอักษร
+    for col in worksheet.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
 tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายช่องทาง (Grid Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
 
@@ -77,7 +101,6 @@ with tab1:
         
         if not has_error and len(manual_results) > 0:
             df_manual_res = pd.DataFrame(manual_results)
-            # แก้ไขจุดนี้: จัดเรียงตามกลุ่มสินค้า (SKU เดิม) ก่อน แล้วตามด้วยรหัสช่องทาง (01 -> 02 -> 03)
             df_manual_res = df_manual_res.sort_values(by=['SKU เดิม', '_Sort_Code']).reset_index(drop=True)
             output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
             df_manual_final = df_manual_res[output_cols]
@@ -88,12 +111,13 @@ with tab1:
             all_new_skus_text = "\n".join(df_manual_final["New_Product_Code"].tolist())
             st.code(all_new_skus_text, language="text")
             
-            st.write("📊 **ตารางสรุปรายละเอียด (จัดเรียงตามรายการสินค้าเรียบร้อย):**")
+            st.write("📊 **ตารางสรุปรายละเอียด:**")
             st.dataframe(df_manual_final, use_container_width=True)
             
             buffer_manual = io.BytesIO()
             with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
+                style_excel_sheet(writer, 'Manual_SKU')
             
             st.download_button(
                 label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (จากตารางกรอกเอง)",
@@ -117,6 +141,7 @@ with tab2:
     buffer_template = io.BytesIO()
     with pd.ExcelWriter(buffer_template, engine='openpyxl') as writer:
         df_template.to_excel(writer, index=False, sheet_name='Template')
+        style_excel_sheet(writer, 'Template')
         
     st.download_button(
         label="📥 ดาวน์โหลดไฟล์เทมเพลต Excel (.xlsx)",
@@ -163,19 +188,19 @@ with tab2:
                         expanded_rows.append(new_row)
                 
                 df_result = pd.DataFrame(expanded_rows)
-                # แก้ไขจุดนี้: จัดเรียงตามกลุ่มสินค้าเดิมก่อน จากนั้นยึดเรียงช่องทาง EI -> TA -> DL ต่อท้ายในสินค้านั้นๆ
                 df_result = df_result.sort_values(by=['_Sku_Old', '_Sort_Code']).reset_index(drop=True)
                 
                 output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
                 df_final_export = df_result[output_cols]
                 
                 st.success("🎉 ระบบแตกไฟล์ข้อมูลและสร้างรหัสทุกช่องทางการขายเสร็จเรียบร้อย!")
-                st.write("📋 **ผลลัพธ์ข้อมูลใหม่ (จัดเรียงตามรายการสินค้าเรียบร้อย):**")
+                st.write("📋 **ผลลัพธ์ข้อมูลใหม่:**")
                 st.dataframe(df_final_export, use_container_width=True)
                 
                 buffer = io.BytesIO()
                 with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
                     df_final_export.to_excel(writer, index=False, sheet_name='All_Channels_SKU')
+                    style_excel_sheet(writer, 'All_Channels_SKU')
                 
                 st.subheader("📤 ส่งออกไฟล์ข้อมูล (Export Excel)")
                 st.download_button(
