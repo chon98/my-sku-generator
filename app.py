@@ -209,3 +209,89 @@ with tab1:
             with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
                 style_excel_sheet(writer, 'Manual_SKU')
+
+with tab2:
+    st.subheader("📥 ดาวน์โหลดไฟล์เทมเพลตสำหรับใช้งาน")
+    
+    template_data = {
+        "SKU เดิม": ["PROD001", "PROD002"],
+        "ชื่อสินค้า": ["ชานม", "กาแฟ"]
+    }
+    df_template = pd.DataFrame(template_data)
+    
+    buffer_template = io.BytesIO()
+    with pd.ExcelWriter(buffer_template, engine='openpyxl') as writer:
+        df_template.to_excel(writer, index=False, sheet_name='Template')
+        style_excel_sheet(writer, 'Template')
+        
+    st.download_button(
+        label="📥 ดาวน์โหลดไฟล์เทมเพลต Excel (.xlsx)",
+        data=buffer_template.getvalue(),
+        file_name="sku_import_template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    
+    st.write("---")
+    st.subheader("📤 นำเข้าไฟล์ข้อมูลเพื่อแตกรหัสสินค้าเป็นทุกช่องทางการขาย")
+    uploaded_file = st.file_uploader("เลือกไฟล์ Excel ของคุณ (รองรับ .xlsx)", type=["xlsx"])
+
+    if uploaded_file is not None:
+        try:
+            df = pd.read_excel(uploaded_file)
+            st.write("📋 **ตัวอย่างข้อมูลที่นำเข้า:**")
+            st.dataframe(df.head())
+            columns = df.columns.tolist()
+            
+            st.subheader("⚙️ ตั้งค่าคอลัมน์ข้อมูล")
+            col1, col2 = st.columns(2)
+            with col1:
+                sku_col = st.selectbox("เลือกคอลัมน์ที่เป็น [SKUเดิม]", options=columns, key="import_sku")
+            with col2:
+                name_col = st.selectbox("เลือกคอลัมน์ที่เป็น [ชื่อสินค้า]", options=columns, key="import_name")
+                
+            if st.button("⚡ เริ่มแตกไฟล์และสร้างรหัส SKU ทั้งหมด"):
+                expanded_rows = []
+                
+                for _, row in df.iterrows():
+                    sku_old = str(row[sku_col]).strip()
+                    p_name = str(row[name_col]).strip()
+                    
+                    for channel, info in channel_map.items():
+                        new_sku = f"{sku_old}{info['code']}{info['abbr']}"
+                        
+                        new_row = {
+                            'New_Product_Code': new_sku,
+                            'ชื่อสินค้า': p_name,
+                            'ช่องทางการขาย': channel,
+                            '_Sort_Code': info['code'],
+                            '_Sku_Old': sku_old
+                        }
+                        expanded_rows.append(new_row)
+                
+                df_result = pd.DataFrame(expanded_rows)
+                df_result = df_result.sort_values(by=['_Sku_Old', '_Sort_Code']).reset_index(drop=True)
+                
+                output_cols = ["New_Product_Code", "ชื่อสินค้า", "ช่องทางการขาย"]
+                df_final_export = df_result[output_cols]
+                
+                st.success("🎉 ระบบแตกไฟล์ข้อมูลและสร้างรหัสทุกช่องทางการขายเสร็จเรียบร้อย!")
+                st.write("📋 **ผลลัพธ์ข้อมูลใหม่:**")
+                st.dataframe(df_final_export, use_container_width=True)
+                
+                buffer = io.BytesIO()
+                with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                    df_final_export.to_excel(writer, index=False, sheet_name='All_Channels_SKU')
+                    style_excel_sheet(writer, 'All_Channels_SKU')
+                
+                st.subheader("📤 ส่งออกไฟล์ข้อมูล (Export Excel)")
+                st.download_button(
+                    label="📥 ดาวน์โหลดไฟล์ Excel ผลลัพธ์ (ครบทุกช่องทาง)",
+                    data=buffer.getvalue(),
+                    file_name="multi_channel_sku_products.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาดในการอ่านไฟล์: {e}")
+    else:
+        st.info("💡 กรุณาอัปโหลดไฟล์ Excel ที่มีคอลัมน์สำหรับ SKU เดิม และ ชื่อสินค้า (ระบบจะนำแต่ละแถวไปสร้างครบทั้ง 3 ช่องทางให้เองอัตโนมัติ)")
+
