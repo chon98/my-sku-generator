@@ -13,9 +13,13 @@ channel_map = {
     'Delivery': {'code': '03', 'abbr': 'DL'}
 }
 
-# ฟังก์ชันตกแต่งหัวข้อตารางและขยายขนาดคอลัมน์อัตโนมัติ
+# ฟังก์ชันตกแต่งหัวข้อตาราง ขยายขนาดคอลัมน์อัตโนมัติ และตรึงแนวแถวบนสุด (Freeze Top Row)
 def style_excel_sheet(writer, sheet_name):
     worksheet = writer.sheets[sheet_name]
+    
+    # 1. ตรึงแนวแถวบนสุด (Freeze Panes - ล็อกแถวที่ 1 ไว้)
+    worksheet.freeze_panes = "A2"
+    
     # สีพื้นหลังสีน้ำเงินเข้ม (Hex: 1F4E78)
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     # ฟอนต์ตัวหนา สีขาว (Hex: FFFFFF)
@@ -32,7 +36,7 @@ def style_excel_sheet(writer, sheet_name):
     # ปรับความกว้างคอลัมน์อัตโนมัติตามความยาวตัวอักษร
     for col in worksheet.columns:
         max_len = max(len(str(cell.value or '')) for cell in col)
-        col_letter = get_column_letter(col[0].column)
+        col_letter = get_column_letter(col.column)
         worksheet.column_dimensions[col_letter].width = max(max_len + 5, 15)
 
 tab1, tab2 = st.tabs(["📝 กรอกข้อมูลเองแบบหลายช่องทาง (Grid Manual)", "📥 อัปโหลดไฟล์ Excel (Import)"])
