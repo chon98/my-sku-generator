@@ -210,4 +210,4 @@ with tab1:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
                 style_excel_sheet(writer, 'Manual_SKU')
             
-            st.download_button(
+            st.download_button
