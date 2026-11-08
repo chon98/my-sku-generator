@@ -83,8 +83,8 @@ translation = {
     }
 }
 
-# 2. จัดวางปุ่มเลือกภาษาและหัวข้อให้สมดุล
-header_left, header_right = st.columns([4, 1])
+# 2. จัดวางปุ่มเลือกภาษาและหัวข้อ
+header_left, header_right = st.columns()
 with header_right:
     lang = st.selectbox("🌐 Language / ภาษา", options=["TH", "EN"], index=0)
 
