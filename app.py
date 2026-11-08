@@ -18,7 +18,7 @@ channel_map = {
     'Eat in': {'code': '01', 'abbr': 'EI'},
     'Take away': {'code': '02', 'abbr': 'TA'},
     'Delivery': {'code': '03', 'abbr': 'DL'},
-	'Grab food': {'code': '04', 'abbr': 'GF'}
+	'Grab food': {'code': '04', 'abbr': 'GF'},
 	'Line man': {'code': '05', 'abbr': 'LM'}
 }
 
