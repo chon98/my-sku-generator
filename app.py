@@ -1,4 +1,4 @@
-import streamlit st
+import streamlit as st
 import pandas as pd
 import io
 from openpyxl.styles import Font, Alignment, PatternFill
@@ -209,5 +209,4 @@ with tab1:
             with pd.ExcelWriter(buffer_manual, engine='openpyxl') as writer:
                 df_manual_final.to_excel(writer, index=False, sheet_name='Manual_SKU')
                 style_excel_sheet(writer, 'Manual_SKU')
-            
             st.download_button(
